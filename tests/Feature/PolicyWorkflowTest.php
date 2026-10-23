@@ -79,15 +79,45 @@ class PolicyWorkflowTest extends TestCase
     /** @test */
     public function invalid_state_transition_is_rejected()
     {
-        config(['mock_insurer.scenario' => 'SUCCESS']);
         $payload = $this->validPayload('REQINV');
         $resp = $this->postJson('/api/policy-requests', $payload);
         $policyId = $resp->json('id');
-        // Directly transition to ISSUED via submit (will be issued)
-        $this->postJson("/api/policy-requests/{$policyId}/submit");
-        // Attempt to submit again; should return early with issued info, not error
-        $again = $this->postJson("/api/policy-requests/{$policyId}/submit");
-        $again->assertStatus(200)->assertJson(['status' => 'issued']);
+        $policy = PolicyRequest::find($policyId);
+
+        // Direct state machine transition test: RECEIVED cannot transition directly to ISSUED
+        $stateMachine = app(\App\Services\PolicyStateMachine::class);
+        $policy->state = 'RECEIVED';
+        $policy->save();
+        $this->assertFalse($stateMachine->transition($policy, 'ISSUED'));
+
+        // Cannot transition from ISSUED to SUBMITTED
+        $policy->state = 'ISSUED';
+        $policy->save();
+        $this->assertFalse($stateMachine->transition($policy, 'SUBMITTED'));
+    }
+
+    /** @test */
+    public function policy_cannot_be_issued_twice_and_returns_idempotent_response()
+    {
+        config(['mock_insurer.scenario' => 'SUCCESS']);
+        $payload = $this->validPayload('REQDOUBLE');
+        $resp = $this->postJson('/api/policy-requests', $payload);
+        $policyId = $resp->json('id');
+
+        // First submit issues the policy
+        $first = $this->postJson("/api/policy-requests/{$policyId}/submit");
+        $first->assertStatus(200)->assertJson(['status' => 'issued']);
+        $policyNumber = $first->json('policy_number');
+        $this->assertNotNull($policyNumber);
+
+        // Second submit returns the same issued policy without reissuing or generating a new number
+        $second = $this->postJson("/api/policy-requests/{$policyId}/submit");
+        $second->assertStatus(200)->assertJson([
+            'status' => 'issued',
+            'policy_number' => $policyNumber,
+        ]);
+
+        $this->assertEquals(1, PolicyRequest::where('policy_number', $policyNumber)->count());
     }
 
     private function validPayload(string $clientRequestId): array

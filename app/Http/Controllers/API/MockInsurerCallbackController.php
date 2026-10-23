@@ -32,20 +32,35 @@ class MockInsurerCallbackController extends Controller
         }
 
         $policy = PolicyRequest::findOrFail($validated['policy_id']);
-        ProviderEvent::create($validated);
+        ProviderEvent::create([
+            'policy_request_id' => $policy->id,
+            'event_id' => $validated['event_id'],
+            'type' => $validated['type'],
+            'payload' => $request->all(),
+        ]);
 
         $stateMachine = app(PolicyStateMachine::class);
 
         // Apply effects based on type
         if ($validated['type'] === 'SUCCESS') {
-            $policy->provider_reference = $validated['provider_reference'];
-            $policy->policy_number = $validated['policy_number'];
+            if (!empty($validated['provider_reference'])) {
+                $policy->provider_reference = $validated['provider_reference'];
+            }
+            if (!empty($validated['policy_number'])) {
+                $policy->policy_number = $validated['policy_number'];
+            }
+            $policy->save();
             $stateMachine->transition($policy, 'ISSUED');
         } elseif ($validated['type'] === 'TEMPORARY_FAILURE') {
             $stateMachine->transition($policy, 'FAILED');
         } elseif ($validated['type'] === 'TIMEOUT_AFTER_ISSUE') {
-            $policy->provider_reference = $validated['provider_reference'];
-            $policy->policy_number = $validated['policy_number'];
+            if (!empty($validated['provider_reference'])) {
+                $policy->provider_reference = $validated['provider_reference'];
+            }
+            if (!empty($validated['policy_number'])) {
+                $policy->policy_number = $validated['policy_number'];
+            }
+            $policy->save();
             $stateMachine->transition($policy, 'NEEDS_RECONCILIATION');
         }
         // other types could be handled similarly

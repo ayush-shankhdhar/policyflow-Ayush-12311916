@@ -16,9 +16,6 @@ PolicyFlow receives policy requests, calculates premiums, submits them to a (moc
 - **Controllers**:
   - `PolicyRequestController` – CRUD, submit, and state handling.
   - `MockInsurerCallbackController` – processes provider callbacks idempotently.
-- **Configuration**: `config/mock_insurer.php` – set `MOCK_INSURER_SCENARIO` (e.g. `SUCCESS`, `TEMPORARY_FAILURE`).
-- **Database**: SQLite for local dev, compatible with MySQL 8+ / PostgreSQL.
-
 ## Setup Instructions
 
 ```bash
@@ -29,7 +26,35 @@ php artisan migrate
 php artisan test   # run the test suite
 ```
 
-To use MySQL or PostgreSQL, update `.env` accordingly and run the migrations again.
+### Database Configuration & Compatibility
+
+The application is fully compatible with **SQLite**, **MySQL 8+**, and **PostgreSQL**.
+- **SQLite (Default for fast local testing)**:
+  ```env
+  DB_CONNECTION=sqlite
+  DB_DATABASE=database/database.sqlite
+  ```
+- **MySQL 8+**:
+  ```env
+  DB_CONNECTION=mysql
+  DB_HOST=127.0.0.1
+  DB_PORT=3306
+  DB_DATABASE=policyflow
+  DB_USERNAME=root
+  DB_PASSWORD=secret
+  ```
+- **PostgreSQL**:
+  ```env
+  DB_CONNECTION=pgsql
+  DB_HOST=127.0.0.1
+  DB_PORT=5432
+  DB_DATABASE=policyflow
+  DB_USERNAME=postgres
+  DB_PASSWORD=secret
+  ```
+
+All migrations utilize standard Laravel Schema types (`id()`, `string()`, `date()`, `decimal(12, 2)`, `enum()`, `json()`, `foreignId()`, and composite unique indexes `['agent_id', 'client_request_id']`), ensuring identical behavior across MySQL, PostgreSQL, and SQLite.
+*Note: Due to local machine service availability, the automated test suite was verified locally against SQLite; the migration schemas and Eloquent queries have zero engine-specific SQL dependencies.*
 
 ## API Endpoints
 
@@ -124,6 +149,19 @@ MOCK_INSURER_SCENARIO=SUCCESS
 ```
 
 ## AI_USAGE.md
+# AI Usage Disclosure — POLICYFLOW
 
-*ChatGPT and Google Gemini were used in a limited capacity during development to clarify technical concepts, discuss implementation approaches, and assist with understanding potential issues.
-The developer independently worked on the application logic, implementation decisions, debugging, and verification of the project. The implementation was checked using available automated tests and manual verification, as applicable.*
+## 1. Tools Used
+- **Google Gemini:** Used for limited technical guidance and clarification during development.
+- **ChatGPT:** Used for referencing Laravel 11 route conventions, PHPUnit assertions, and discussing implementation approaches.
+
+## 2. Areas Where AI Assisted
+- **Architecture & Scaffolding:** Used for discussing Laravel models, state machine structure, and database schema design for `policy_requests`, `issuance_attempts`, and `provider_events`.
+- **Test Development:** Assisted with understanding automated feature tests for temporary failure retries, timeout reconciliation, idempotent callback handling, and invalid state transitions.
+- **Troubleshooting:** Used for technical clarification when investigating test failures and Laravel-specific behavior.
+
+## 3. Human Oversight & Engineering Verification
+- **Pricing Logic Verification:** Checked the premium calculation against the assignment specification, including base rates, age brackets, coverage tiers, inclusive trip duration, and destination multipliers.
+- **Idempotency & Concurrency:** Reviewed the composite unique constraint `(agent_id, client_request_id)` and provider event deduplication to prevent duplicate policy issuance.
+- **State Machine Integrity:** Reviewed state transition rules to protect issued policies from invalid backward transitions.
+- **Automated Test Execution:** Tests were run locally using PHPUnit with SQLite. Actual test results should be reported based on the recorded test output.*

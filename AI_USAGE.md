@@ -1,0 +1,2 @@
+*ChatGPT and Google Gemini were used in a limited capacity during development to clarify technical concepts, discuss implementation approaches, and assist with understanding potential issues.
+The developer independently worked on the application logic, implementation decisions, debugging, and verification of the project. The implementation was checked using available automated tests and manual verification, as applicable.*
